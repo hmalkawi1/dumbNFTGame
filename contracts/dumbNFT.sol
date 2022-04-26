@@ -41,16 +41,16 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "erc721a/contracts/ERC721A.sol";
-import "./abstract/Withdrawable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "hardhat/console.sol";
 
-contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
+contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     VRFCoordinatorV2Interface COORDINATOR;
     LinkTokenInterface LINKTOKEN;
     address vrfCoordinator = 0x6168499c0cFfCaCD319c818142124B7A15E857ab; //(RINKEBY)
@@ -68,29 +68,24 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
     }
 
     SaleState public saleState = SaleState.Disabled;
-
-    bool public revealEnabled;
+    //should we disable transfers once things are revealed to stop trading ? or?
     bool public transfersEnabled;
     bool public revealAll;
 
     uint256 public price;
-    // Should be equal to total winnings / num winners
-    uint256 public percentageSplit;
+    uint256 public winnerAmountPerNFT;
 
     uint256[] public random;
     uint256 public gameNumber;
     uint32 public numWords;
-    uint256 public gameStartingTokenID = 1;
+    uint256 public gameStartingTokenID = 0;
 
-    ERC721A public DumbNFT;
-
-    // The unRevealedUri that new mints use when all are not revealed
     string public unRevealUri;
-    // The reveal uri used once a token is revealed or all are revealed
     string public revealUri;
+    //MAKE SURE TO CHANGE THIS INTO CONSTRUCTOR BEFORE DEPLOYING
+    address payable devWallet = payable(0x361d65CBbAE9dC942E58Dc89c24aBa7195750b24); 
 
-    // Revealed event is triggered whenever a user reveals a token, address is indexed to make it filterable
-    event Revealed(address indexed user, uint256 tokenId, uint256 timestamp);
+    event Revealed(uint256 timestamp, uint256[] winningNFTs);
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
 
 
@@ -101,7 +96,6 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         s_subscriptionId = subscriptionId;
         
         //Defaults
-        revealEnabled = false;
         revealAll = false;
 
         price = 10000000000000000;
@@ -113,7 +107,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         _;
     }
     modifier whenRevealIsEnabled() {
-        require(revealEnabled, "Reveal is not yet enabled");
+        require(revealAll, "Reveal is not yet enabled");
         _;
     }
     // Modifier for winner
@@ -131,17 +125,16 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
     // Payable mint function for unrevealed NFTs
     function mint(uint256 amount) external payable whenSaleIsActive {
 
-        require(price * amount <= msg.value, "Value sent is not correct");
+        require(price * amount == msg.value, "Value sent is not correct");
         
         _safeMint(msg.sender, amount);
 
     }
     
-    function withdrawETHWinner(address payable receiver, uint256 _tokenId) external whenRevealIsEnabled onlyWinner(_tokenId) {
-        require(receiver != address(0), "Cannot recover ETH to the 0 address");
+    function withdrawETHWinner(uint256 _tokenId) external payable whenRevealIsEnabled onlyWinner(_tokenId) {
+        require(msg.sender != address(0), "Cannot recover ETH to the 0 address");
+        payable(msg.sender).transfer(winnerAmountPerNFT);
         _removeWinningTokenOnceClaimed(_tokenId);
-        uint256 winnerSplit = _calculateWinnersSplit();
-        receiver.transfer(winnerSplit);
     }
 
 
@@ -150,6 +143,9 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
     // Owner functions
     //++++++++
 
+    function setDevWallet(address payable devWallet_) public onlyOwner{
+        devWallet = payable(devWallet_);
+    }
 
     // Sale functions
     function setSaleState(uint256 _state) external onlyOwner {
@@ -163,14 +159,9 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         price = _mintPrice;
     }
 
-    // Reveal functions
-    function toggleRevealState() external onlyOwner {
-        revealEnabled = !revealEnabled;
-    }
-
     // Get random for revealed NFTs
     function GetRandom() external onlyOwner {
-        setNumWords();
+        _setNumWords();
         COORDINATOR.requestRandomWords(keyHash, s_subscriptionId, requestConfirmations, callbackGasLimit, numWords);
     }
 
@@ -191,10 +182,16 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
 
 
     function toggleRevealAll() external onlyOwner {
+        //get random should be called in here
         revealAll = !revealAll;
         if(revealAll == true){
+
+            //maybe do all this work in a purge game function()
             gameNumber+=1;
             gameStartingTokenID = totalSupply() + 1;
+            _devWithdraw();
+            winnerAmountPerNFT = _calculateWinnersSplit();
+            emit Revealed(block.timestamp, random);
         }
     }
 
@@ -206,12 +203,19 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         return 1;
     }
 
+    //HARDCODED TO WITHDRAW 10%, CHANGE FOR PROD
+    function _devWithdraw() internal {
+        uint256 balance = address(this).balance;
+        balance = balance/10;
+        devWallet.transfer(balance);
+    }
+
     // Hardcoded for 90% right now, can change
     // only need to run this once
     // We have total: 10 eth -> 
+    //calculates percent of winnings per single winning NFT
     function _calculateWinnersSplit() public view returns(uint256){
         uint256 balance = address(this).balance;
-        balance = (balance * 9) /10;
         balance = balance / random.length;
         return balance;
     }
@@ -223,7 +227,6 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
             }
         }
         return false;
-
     }
 
     // removes winning token from random to ensure winners dont claim twice
@@ -244,15 +247,23 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         //returns a number within a range of 1-50, can be whatever range we want
         //random = (randomWords[0] % 50) + 1;
 
-        for(uint256 i = 0; i < numWords; i++){
-            random[i] = (randomWords[0] % totalSupply()) + 1;
+        if(gameNumber == 1){
+            for(uint256 i = 0; i < numWords; i++){
+                random[i] = (randomWords[i] % totalSupply()) + 1;
+            }
+        }
+        else{
+            for(uint256 i = 0; i < numWords; i++){
+                random[i] = (randomWords[i] % totalSupply()) + gameStartingTokenID;
+            }
         }
     }
 
-    function setNumWords() internal {
-        //set it to be 5% of the supply
-        //could there be an issue by type casting to uint32? 
-        numWords = uint32(totalSupply() * 0.05);
+    //should be internal, public right now for testing
+    function _setNumWords() internal {
+        //could there be an issue by type casting to uint32?
+
+        numWords = uint32(((totalSupply() - gameStartingTokenID)* 5)/ 100);
     }
 
     //++++++++
@@ -278,13 +289,13 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         }
     }
 
-    function findWinners() internal returns (uint256[] memory expandedValues){
-        expandedValues = new uint256[](totalSupply() * 50000000); //use safemath
-        for (uint256 i = 0; i < totalSupply(); i++) {
-            expandedValues[i] = uint256(keccak256(abi.encode(random, i))) % totalSupply();
-        }
-        return expandedValues;
-    }
+    // function findWinners() internal returns (uint256[] memory expandedValues){
+    //     expandedValues = new uint256[](totalSupply() * 50000000); //use safemath
+    //     for (uint256 i = 0; i < totalSupply(); i++) {
+    //         expandedValues[i] = uint256(keccak256(abi.encode(random, i))) % totalSupply();
+    //     }
+    //     return expandedValues;
+    // }
 
     //++++++++
     // Test functions
@@ -294,8 +305,10 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
         random = random_;
     }
 
-    function setNumWords(uint32 numWords_) public {
-        numWords = numWords_;
+    function setNumWordsTEST() public {
+        //could there be an issue by type casting to uint32?
+
+        numWords = uint32(((totalSupply() - gameStartingTokenID)* 5)/ 100);
     }
 
     function getRandom() public view returns(uint256[] memory){
@@ -317,5 +330,3 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable, Withdrawable {
     }
 
 }
-
-// totalSupply * random * tokenID, totalSupply-1
