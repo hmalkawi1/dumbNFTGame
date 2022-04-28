@@ -42,21 +42,17 @@ pragma solidity 0.8.7;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "hardhat/console.sol";
+
+
 
 contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     VRFCoordinatorV2Interface COORDINATOR;
-    LinkTokenInterface LINKTOKEN;
-    address vrfCoordinator = 0x6168499c0cFfCaCD319c818142124B7A15E857ab; //(RINKEBY)
-    address link = 0x01BE23585060835E02B77ef475b0Cc51aA1e0709; //(RINKEBY)
+    address vrfCoordinator = 0x6168499c0cFfCaCD319c818142124B7A15E857ab; //(RINKEBY) 
     bytes32 internal keyHash = 0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc; //(RINKEBY)
-    uint32 callbackGasLimit = 50000;
+    uint32 callbackGasLimit = 100000;
     // The default is 3, but you can set this higher.
     uint16 requestConfirmations = 3;
     // Get a subscription ID from https://vrf.chain.link/ to use in the constructor during deployment
@@ -67,6 +63,15 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         Enable
     }
 
+    // struct gameStats{
+    //     uint256[] public random;
+    //     uint256 public gameNumber;
+    //     uint32 public numWords;
+    //     uint256 public gameStartingTokenID;
+    //     uint256 public s_requestId;
+
+    // }
+
     SaleState public saleState = SaleState.Disabled;
     //should we disable transfers once things are revealed to stop trading ? or?
     bool public transfersEnabled;
@@ -76,9 +81,11 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     uint256 public winnerAmountPerNFT;
 
     uint256[] public random;
+    uint256 public s_requestId;
+
     uint256 public gameNumber;
     uint32 public numWords;
-    uint256 public gameStartingTokenID = 0;
+    uint256 public gameStartingTokenID;
 
     string public unRevealUri;
     string public revealUri;
@@ -92,14 +99,16 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     constructor(uint64 subscriptionId) ERC721A("DumbNFT", "DNFT") VRFConsumerBaseV2(vrfCoordinator) {
         //Chainlink
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
-        LINKTOKEN = LinkTokenInterface(link);
         s_subscriptionId = subscriptionId;
+
+
         
         //Defaults
         revealAll = false;
 
         price = 10000000000000000;
         gameNumber = 1;
+        gameStartingTokenID = 0;
     }
 
     modifier whenSaleIsActive() {
@@ -160,9 +169,16 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     }
 
     // Get random for revealed NFTs
-    function GetRandom() external onlyOwner {
+    function getRandom() external onlyOwner {
         _setNumWords();
-        COORDINATOR.requestRandomWords(keyHash, s_subscriptionId, requestConfirmations, callbackGasLimit, numWords);
+        // _setGasCallbackLimit();
+        s_requestId = COORDINATOR.requestRandomWords(
+            keyHash,
+            s_subscriptionId,
+            requestConfirmations,
+            callbackGasLimit,
+            numWords
+        );
     }
 
     // Change the reveal URI set for new mints, this should be a path to all jsons
@@ -182,10 +198,11 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
 
     function toggleRevealAll() external onlyOwner {
+        require(random.length>0,"No winners have been decided yet");
         //get random should be called in here
         revealAll = !revealAll;
         if(revealAll == true){
-
+            //getRandom()
             //maybe do all this work in a purge game function()
             gameNumber+=1;
             gameStartingTokenID = totalSupply() + 1;
@@ -242,12 +259,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     }
 
     function fulfillRandomWords(uint256, uint256[] memory randomWords) internal override {
-        //random = randomWords[0];
-        
-        //returns a number within a range of 1-50, can be whatever range we want
-        //random = (randomWords[0] % 50) + 1;
-
-        if(gameNumber == 1){
+         if(gameNumber == 1){
             for(uint256 i = 0; i < numWords; i++){
                 random[i] = (randomWords[i] % totalSupply()) + 1;
             }
@@ -265,6 +277,11 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
         numWords = uint32(((totalSupply() - gameStartingTokenID)* 5)/ 100);
     }
+
+    // function _setCallbackGasLimit() internal {
+    //     //Chainlink requires roughly 20,000 gas to store 1 value. 30000 to be safe
+    //     return callbackGasLimit = numWords * 30000; 
+    // }
 
     //++++++++
     // Override functions
@@ -289,36 +306,12 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         }
     }
 
-    // function findWinners() internal returns (uint256[] memory expandedValues){
-    //     expandedValues = new uint256[](totalSupply() * 50000000); //use safemath
-    //     for (uint256 i = 0; i < totalSupply(); i++) {
-    //         expandedValues[i] = uint256(keccak256(abi.encode(random, i))) % totalSupply();
-    //     }
-    //     return expandedValues;
-    // }
-
     //++++++++
     // Test functions
     //++++++++
 
     function setRandom(uint256[] calldata random_) public {
         random = random_;
-    }
-
-    function setNumWordsTEST() public {
-        //could there be an issue by type casting to uint32?
-
-        numWords = uint32(((totalSupply() - gameStartingTokenID)* 5)/ 100);
-    }
-
-    function getRandom() public view returns(uint256[] memory){
-        return random;
-    }
-
-    function printRandom() public{
-        for(uint256 i = 0; i<random.length;i++){
-            console.log(random[i]);
-        }
     }
 
     function deposit() external payable {
@@ -328,5 +321,6 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     function balance() external view returns(uint256){
         return address(this).balance;
     }
+
 
 }

@@ -1,11 +1,13 @@
 const { expect } = require("chai");
 const { constants } = require("ethers");
 const { ethers, waffle } = require("hardhat");
+const { int } = require("hardhat/internal/core/params/argumentTypes");
 
 describe("dumbNFT", function () {
   let deployer, user1, user2;
   let dumbNFT;
   let provider;
+
   before(async function () {
     [deployer, user1, user2] = await hre.ethers.getSigners();
     const provider = ethers.provider;
@@ -13,7 +15,7 @@ describe("dumbNFT", function () {
 
   beforeEach(async function () {
     const DumbNFT = await hre.ethers.getContractFactory("DumbNFT");
-    dumbNFT = await DumbNFT.deploy(819);
+    dumbNFT = await DumbNFT.deploy(3383);
     await dumbNFT.deployed();
   });
 
