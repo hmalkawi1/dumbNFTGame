@@ -301,7 +301,7 @@ describe("dumbNFT", function () {
     });
   });
 
-  it("Should run through 1 whole game and allow withdrawls", async function () {
+  it.only("Should run through 1 whole game and allow withdrawls", async function () {
     await dumbNFT.setSaleState(1);
 
     await dumbNFT.setRevealUri("Revealed");
@@ -332,7 +332,6 @@ describe("dumbNFT", function () {
     });
 
     //ensure values are correct after everyones mint
-    expect(await dumbNFT.totalSupply()).to.eq(7873);
     expect(await dumbNFT.gameNumber()).to.eq(1);
     expect(await dumbNFT.gameStartingTokenID()).to.eq(0);
 
@@ -343,6 +342,8 @@ describe("dumbNFT", function () {
 
     await dumbNFT.toggleRevealAll();
     expect(await dumbNFT.tokenURI(1688)).to.eq("Revealed");
+
+    console.log(await dumbNFT.winnerAmountPerNFT());
 
     expect(await dumbNFT.winnerAmountPerNFT()).to.eq(11809500000000000000n);
 
