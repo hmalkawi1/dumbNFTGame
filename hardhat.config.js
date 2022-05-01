@@ -17,7 +17,7 @@ const config = {
     strict: true,
   },
   gasReporter: {
-    enabled: false,
+    enabled: true,
     coinmarketcap: "2bd639b0-ef37-4768-8aa5-b1f6dd6ed437",
     currency: "USD",
   },

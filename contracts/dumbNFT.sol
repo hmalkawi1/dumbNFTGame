@@ -1,10 +1,5 @@
 /*
-
 MUST FIGURE OUT DEV AND USERS SPLITS
-
-Filter so that only unique values can be claimed
-
-
 */
 
 
@@ -39,7 +34,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         uint256 numMints;
         uint256 mintStart;
     }
-
+    mapping(uint256=>bool) claimed;
     mapping(uint256=>Game) public games; 
 
     SaleState public saleState = SaleState.Disabled;
@@ -53,6 +48,8 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     uint256[] public random;
     uint256[] public emergencyRandom;
     uint256 public s_requestId;
+
+    uint256 public devSplit = 10;
 
     uint256 public gameNumber;
     uint256 public gameStartingTokenID;
@@ -99,7 +96,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     modifier onlyWinner(uint256 tokenId_) {
         require(ownerOf(tokenId_) == msg.sender, "Are you trolling ? You don't even own this NFT... lol");
         require(_verifyWinningToken(tokenId_), "You lost or you already claimed. Don't try this again lol... please...");
-        require(claimed[tokenId_] == false, "lol...come on man...begging you lol");
+        require(claimed[tokenId_] == false, "lol...come on man you already...begging you lol");
         _;
     }
 
@@ -114,7 +111,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         _safeMint(msg.sender, amount);
 
     }
-    mapping(uint256=>bool) claimed;
+
     function withdrawETHWinner(uint256 tokenId_) external payable whenRevealIsEnabled onlyWinner(tokenId_) {
         require(msg.sender != address(0), "Cannot recover ETH to the 0 address");
         payable(msg.sender).transfer(winnerAmountPerNFT);
@@ -127,6 +124,10 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     //++++++++
     // Owner functions
     //++++++++
+
+    function setDevSplit(uint256 devSplit_) public onlyOwner {
+        devSplit = devSplit_;
+    }
 
     function setDevWallet(address payable devWallet_) public onlyOwner{
         devWallet = payable(devWallet_);
@@ -212,7 +213,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         games[gameNumber].numWords = numWords;
         games[gameNumber].numMints = totalSupply() - gameStartingTokenID;
         games[gameNumber].mintStart = gameStartingTokenID;
-
+       
         emit GameComplete(games[gameNumber]);
 
         //Prep values for next game
@@ -225,7 +226,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     //HARDCODED TO WITHDRAW 10%, CHANGE FOR PROD
     function _devWithdraw() internal {
         uint256 balance = address(this).balance;
-        balance = balance/10;
+        balance = balance/devSplit;
         devWallet.transfer(balance);
     }
 
@@ -301,7 +302,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     function _verifyWinnerforTokenUri(uint256 tokenId_) internal view returns(bool){
         bool winner;
         for (uint256 i=0; i<=gameNumber; i++){
-            if(games[i].mintStart < tokenId_ || tokenId_ < games[i].numMints){
+            if(games[i].mintStart < tokenId_ && tokenId_ < games[i].numMints){
                 return _verifyWinnerbyTokenId(tokenId_, games[i].random);
             }
         }

@@ -301,7 +301,7 @@ describe("dumbNFT", function () {
     });
   });
 
-  it.only("Should run through 1 whole game and allow withdrawls", async function () {
+  it("Should run through 1 whole game and allow withdrawls", async function () {
     await dumbNFT.setSaleState(1);
 
     await dumbNFT.setRevealUri("Revealed");
@@ -358,5 +358,72 @@ describe("dumbNFT", function () {
     await contractFromUser1.withdrawETHWinner(2689);
     await contractFromUser2.withdrawETHWinner(5555);
     await contractFromUser2.withdrawETHWinner(7655);
+  });
+  describe("proper tests", function () {
+    it.only("running multiple games", async function () {
+      await dumbNFT.setSaleState(1);
+      await dumbNFT.mint(100, {
+        value: hre.ethers.BigNumber.from("1000000000000000000"),
+      });
+
+      await dumbNFT.setSaleState(0);
+      const expectedRandomArray = [
+        10, 26, 76, 46, 5, 29, 80, 65, 32, 12, 45, 6, 7, 9, 99, 81, 64, 23, 46,
+        67, 91, 79, 73, 61,
+      ];
+      await dumbNFT.setRandom(expectedRandomArray);
+      await dumbNFT.toggleRevealAll();
+      expect(await dumbNFT.revealAll()).to.equal(true);
+      await dumbNFT.withdrawETHWinner(10);
+      //console.log(await dumbNFT.games(1));
+      expect(await dumbNFT.tokenURI(26)).to.eq("Winner.json");
+
+      await dumbNFT.toggleRevealAll();
+      //console.log(await dumbNFT.random());
+      //expect(await dumbNFT.random()).to.eq([]);
+
+      ////////////End OF GAME 1 ///////////////////
+
+      // await dumbNFT.setSaleState(1);
+
+      // await dumbNFT.setRevealUri("Revealed");
+      // await dumbNFT.setUnRevealUri("Unrevealed");
+
+      // const contractFromUser1 = await hre.ethers.getContractAt(
+      //   "DumbNFT",
+      //   dumbNFT.address,
+      //   user1
+      // );
+
+      // const contractFromUser2 = await hre.ethers.getContractAt(
+      //   "DumbNFT",
+      //   dumbNFT.address,
+      //   user2
+      // );
+
+      // await dumbNFT.mint(1450, {
+      //   value: hre.ethers.BigNumber.from("14500000000000000000"),
+      // });
+
+      // await contractFromUser1.mint(3770, {
+      //   value: hre.ethers.BigNumber.from("37700000000000000000"),
+      // });
+
+      // await contractFromUser2.mint(2653, {
+      //   value: hre.ethers.BigNumber.from("26530000000000000000"),
+      // });
+
+      // //ensure values are correct after everyones mint
+      // expect(await dumbNFT.gameNumber()).to.eq(1);
+      // expect(await dumbNFT.gameStartingTokenID()).to.eq(0);
+
+      // await dumbNFT.setSaleState(0);
+
+      // const expectedRandomArray = [1001, 268, 7655, 406, 5555, 2689];
+      // await dumbNFT.setRandom(expectedRandomArray);
+
+      // await dumbNFT.toggleRevealAll();
+      // expect(await dumbNFT.tokenURI(1688)).to.eq("Revealed");
+    });
   });
 });
