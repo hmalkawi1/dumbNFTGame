@@ -1,8 +1,3 @@
-/*
-MUST FIGURE OUT DEV AND USERS SPLITS
-*/
-
-
 pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -34,27 +29,22 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         uint256 numMints;
         uint256 mintStart;
     }
-    mapping(uint256=>bool) claimed;
+    /////////////////////////////TURN CLAIMED PRIVATE AFTER TESTING///////////////////////////////////////////
+    mapping(uint256=>bool) public claimed;
     mapping(uint256=>Game) public games; 
 
     SaleState public saleState = SaleState.Disabled;
-    //should we disable transfers once things are revealed to stop trading ? or?
-    bool public transfersEnabled;
+    
     bool public revealAll;
-
+    uint32 public numWords;
     uint256 public price;
     uint256 public winnerAmountPerNFT;
-
-    uint256[] public random;
-    uint256[] public emergencyRandom;
     uint256 public s_requestId;
-
-    uint256 public devSplit = 10;
-
+    uint256 public devSplit = 30;
     uint256 public gameNumber;
     uint256 public gameStartingTokenID;
-    uint32 public numWords;
-
+    uint256[] public random;
+    uint256[] public emergencyRandom;
     string public unRevealUri;
     string public revealUri;
     
@@ -93,10 +83,12 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         _;
     }
     // Modifier for winner
+    /////////////////////////// IDK IF WE ACTUALLY NEED THE CLAIMED REQUIRE//////////////////////////////////
     modifier onlyWinner(uint256 tokenId_) {
         require(ownerOf(tokenId_) == msg.sender, "Are you trolling ? You don't even own this NFT... lol");
-        require(_verifyWinningToken(tokenId_), "You lost or you already claimed. Don't try this again lol... please...");
         require(claimed[tokenId_] == false, "lol...come on man you already...begging you lol");
+        require(_verifyWinningToken(tokenId_), "You lost or you already claimed. Don't try this again lol... please...");
+        
         _;
     }
 
@@ -116,6 +108,8 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         require(msg.sender != address(0), "Cannot recover ETH to the 0 address");
         payable(msg.sender).transfer(winnerAmountPerNFT);
         claimed[tokenId_] = true;
+        //TEST IF THIS ACTUALLY MESSES WITH THE GAME
+        mintForCommunity(msg.sender,1);
         _removeWinningTokenOnceClaimed(tokenId_);
     }
 
@@ -165,19 +159,17 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
             emergancyNumWords_
         );
     }
-
     
     function setRevealUri(string calldata uri_) external onlyOwner {
         revealUri = uri_;
     }
 
-    
     function setUnRevealUri(string calldata uri_) external onlyOwner {
         unRevealUri = uri_;
     }
 
     // Un-paid mint function for community giveaways
-    function mintForCommunity(address to_, uint256 amount_) external onlyOwner {
+    function mintForCommunity(address to_, uint256 amount_) public onlyOwner {
         _safeMint(to_, amount_);
     }
 
@@ -223,16 +215,16 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         winnerAmountPerNFT = _calculateWinnersSplit();
     }
 
-    //HARDCODED TO WITHDRAW 10%, CHANGE FOR PROD
+    
     function _devWithdraw() internal {
         uint256 balance = address(this).balance;
-        balance = balance/devSplit;
+        //console.log("contract balance before = %s", balance);
+        balance = balance * devSplit /100;
+        //console.log("devs will get this much = %s", balance);
         devWallet.transfer(balance);
     }
 
-    // Hardcoded for 90% right now, can change
-    // only need to run this once
-    // We have total: 10 eth -> 
+
     //calculates percent of winnings per single winning NFT
     function _calculateWinnersSplit() internal view returns(uint256){
         uint256 balance = address(this).balance;
@@ -368,6 +360,25 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
     function setNumWordsTEST(uint32 numWords_) public{
         numWords = numWords_;
+    }
+
+    function setEmergancyRandom(uint256[] calldata emrg_) public {
+        emergencyRandom = emrg_;
+    }
+
+    function _calculateWinnersSplitTEST() public view returns(uint256){
+        uint256 balance = address(this).balance;
+        balance = balance / random.length;
+        return balance;
+    }
+
+    function verifyWinningToken(uint256 tokenId_) public view virtual returns (bool){
+        for (uint256 i = 0; i < random.length; i++){
+            if (tokenId_ == random[i]){
+                return true;
+            }
+        }
+        return false;
     }
 
 }

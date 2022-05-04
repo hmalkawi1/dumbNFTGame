@@ -2,6 +2,7 @@ const { expect } = require("chai");
 const { constants } = require("ethers");
 const { ethers, waffle } = require("hardhat");
 const { int } = require("hardhat/internal/core/params/argumentTypes");
+const { BigNumber } = require("@ethersproject/bignumber");
 
 describe("dumbNFT", function () {
   let deployer, user1, user2;
@@ -22,20 +23,14 @@ describe("dumbNFT", function () {
   describe("Minting", function () {
     it("should be possible to mint after the sale has started", async function () {
       await dumbNFT.setSaleState(1);
-      const contractFromUser = await hre.ethers.getContractAt(
-        "DumbNFT",
-        dumbNFT.address,
-        user1
-      );
+      const contractFromUser = await hre.ethers.getContractAt("DumbNFT", dumbNFT.address, user1);
 
       const prevTotalBalance = await dumbNFT.totalSupply();
       await contractFromUser.mint(1, {
         value: hre.ethers.BigNumber.from("10000000000000000"),
       });
 
-      expect((await dumbNFT.totalSupply()).toNumber()).to.equal(
-        prevTotalBalance.add(1).toNumber()
-      );
+      expect((await dumbNFT.totalSupply()).toNumber()).to.equal(prevTotalBalance.add(1).toNumber());
     });
 
     it("should not be possible to mint if the sale has not started yet", async function () {
@@ -50,11 +45,7 @@ describe("dumbNFT", function () {
   describe("Reveal and chainlink random values", function () {
     it("setNum should return 5% of supply always, even after multiple games", async function () {
       await dumbNFT.setSaleState(1);
-      const contractFromUser = await hre.ethers.getContractAt(
-        "DumbNFT",
-        dumbNFT.address,
-        user1
-      );
+      const contractFromUser = await hre.ethers.getContractAt("DumbNFT", dumbNFT.address, user1);
 
       await contractFromUser.mint(10000, {
         value: hre.ethers.BigNumber.from("100000000000000000000"),
@@ -98,9 +89,7 @@ describe("dumbNFT", function () {
       await contractFromUser.mint(3541, {
         value: hre.ethers.BigNumber.from("35410000000000000000"),
       });
-      expect(await dumbNFT.gameStartingTokenID()).to.eq(
-        prevTotalBalance.add(1)
-      );
+      expect(await dumbNFT.gameStartingTokenID()).to.eq(prevTotalBalance.add(1));
       await dumbNFT.setNumWordsTEST();
       //returns 177 (floors answer), exact val = 177.05
       expect(await dumbNFT.numWords()).to.eq(177);
@@ -116,9 +105,7 @@ describe("dumbNFT", function () {
       await contractFromUser.mint(7943, {
         value: hre.ethers.BigNumber.from("79430000000000000000"),
       });
-      expect(await dumbNFT.gameStartingTokenID()).to.eq(
-        prevTotalBalance2.add(1)
-      );
+      expect(await dumbNFT.gameStartingTokenID()).to.eq(prevTotalBalance2.add(1));
       await dumbNFT.setNumWordsTEST();
       //returns 177 (floors answer), exact val = 177.05
       expect(await dumbNFT.numWords()).to.eq(397);
@@ -213,9 +200,7 @@ describe("dumbNFT", function () {
 
   describe("Winners not being able to withdraw when criteria not met", function () {
     it("should not be possible to withdraw when unrevealed", async function () {
-      await expect(dumbNFT.withdrawETHWinner(1)).to.be.revertedWith(
-        "Reveal is not yet enabled"
-      );
+      await expect(dumbNFT.withdrawETHWinner(1)).to.be.revertedWith("Reveal is not yet enabled");
     });
     it("should not be possible to withdraw when I am not a winner", async function () {
       const expectedRandomArray = [5, 6, 8];
@@ -227,9 +212,7 @@ describe("dumbNFT", function () {
       await dumbNFT.mint(1, {
         value: hre.ethers.BigNumber.from("10000000000000000"),
       });
-      await expect(dumbNFT.withdrawETHWinner(1)).to.be.revertedWith(
-        "You lost don't try this again lol"
-      );
+      await expect(dumbNFT.withdrawETHWinner(1)).to.be.revertedWith("You lost don't try this again lol");
     });
     it("should not be possible to withdraw when I am not an owner", async function () {
       const expectedRandomArray = [5, 6, 8];
@@ -241,14 +224,8 @@ describe("dumbNFT", function () {
       await dumbNFT.mint(1, {
         value: hre.ethers.BigNumber.from("10000000000000000"),
       });
-      const contractFromUser = await hre.ethers.getContractAt(
-        "DumbNFT",
-        dumbNFT.address,
-        user1
-      );
-      await expect(contractFromUser.withdrawETHWinner(1)).to.be.revertedWith(
-        "You do not own this NFT"
-      );
+      const contractFromUser = await hre.ethers.getContractAt("DumbNFT", dumbNFT.address, user1);
+      await expect(contractFromUser.withdrawETHWinner(1)).to.be.revertedWith("You do not own this NFT");
     });
 
     it("should be able to withdraw", async function () {
@@ -258,11 +235,7 @@ describe("dumbNFT", function () {
       await dumbNFT.setUnRevealUri("unrevealed");
       await dumbNFT.setRevealUri("revealed");
 
-      const contractFromUser1 = await hre.ethers.getContractAt(
-        "DumbNFT",
-        dumbNFT.address,
-        user1
-      );
+      const contractFromUser1 = await hre.ethers.getContractAt("DumbNFT", dumbNFT.address, user1);
 
       await contractFromUser1.mint(1, {
         value: hre.ethers.BigNumber.from("10000000000000000"),
@@ -307,17 +280,9 @@ describe("dumbNFT", function () {
     await dumbNFT.setRevealUri("Revealed");
     await dumbNFT.setUnRevealUri("Unrevealed");
 
-    const contractFromUser1 = await hre.ethers.getContractAt(
-      "DumbNFT",
-      dumbNFT.address,
-      user1
-    );
+    const contractFromUser1 = await hre.ethers.getContractAt("DumbNFT", dumbNFT.address, user1);
 
-    const contractFromUser2 = await hre.ethers.getContractAt(
-      "DumbNFT",
-      dumbNFT.address,
-      user2
-    );
+    const contractFromUser2 = await hre.ethers.getContractAt("DumbNFT", dumbNFT.address, user2);
 
     await dumbNFT.mint(1450, {
       value: hre.ethers.BigNumber.from("14500000000000000000"),
@@ -361,69 +326,124 @@ describe("dumbNFT", function () {
   });
   describe("proper tests", function () {
     it.only("running multiple games", async function () {
-      await dumbNFT.setSaleState(1);
-      await dumbNFT.mint(100, {
-        value: hre.ethers.BigNumber.from("1000000000000000000"),
-      });
+      for (let i = 1; i < 4; i++) {
+        //1) Open Minting
+        await dumbNFT.setSaleState(1);
+        //2)randomly mint an amount
+        const mintedAmount = Math.floor(Math.random() * (1000 - 501) + 501);
+        let value = mintedAmount.toString() * "10000000000000000";
 
-      await dumbNFT.setSaleState(0);
-      const expectedRandomArray = [
-        10, 26, 76, 46, 5, 29, 80, 65, 32, 12, 45, 6, 7, 9, 99, 81, 64, 23, 46,
-        67, 91, 79, 73, 61,
-      ];
-      await dumbNFT.setRandom(expectedRandomArray);
-      await dumbNFT.toggleRevealAll();
-      expect(await dumbNFT.revealAll()).to.equal(true);
-      await dumbNFT.withdrawETHWinner(10);
-      //console.log(await dumbNFT.games(1));
-      expect(await dumbNFT.tokenURI(26)).to.eq("Winner.json");
+        await dumbNFT.mint(mintedAmount, {
+          value: hre.ethers.BigNumber.from(value.toString()),
+        });
+        //3) Turn off sales
+        await dumbNFT.setSaleState(0);
 
-      await dumbNFT.toggleRevealAll();
-      //console.log(await dumbNFT.random());
-      //expect(await dumbNFT.random()).to.eq([]);
+        //4) generate random array and set it
+        const randomSize = mintedAmount * 0.05;
+        let randomArray = [];
+        let startingGameId = await dumbNFT.gameStartingTokenID();
+        const maxRandom = startingGameId.add(hre.ethers.BigNumber.from(mintedAmount.toString()));
+        console.log("//////////Max Random for testing =//////////////" + maxRandom);
 
-      ////////////End OF GAME 1 ///////////////////
+        //if first game then do this:
+        for (let i = 0; i < randomSize; i++) {
+          randomArray.push(Math.floor(Math.random() * (maxRandom - startingGameId) + startingGameId));
+        }
 
-      // await dumbNFT.setSaleState(1);
+        console.log("we're on game#" + i);
+        console.log("minted amount for this round is = " + mintedAmount);
+        console.log("starting TokenId of this game is = " + (await dumbNFT.gameStartingTokenID()));
+        console.table(randomArray);
 
-      // await dumbNFT.setRevealUri("Revealed");
-      // await dumbNFT.setUnRevealUri("Unrevealed");
+        await dumbNFT.setRandom(randomArray);
 
-      // const contractFromUser1 = await hre.ethers.getContractAt(
-      //   "DumbNFT",
-      //   dumbNFT.address,
-      //   user1
-      // );
+        //5) Toggle Reveal
+        /*
+          - make sure revealAll = true
+          - Dev recieves proper amount (30%)
+          - winners are able to withdraw their winnings + recieve 1 free NFT per win
+          - check total supply = previous total supply + randoms length since each winner got 1 free entry
+          - game struct is set
+          - check balances
+          - revealed event is sent
+        */
+        const contBalancePreDev = await dumbNFT.balance();
+        const deployerBalance = await deployer.getBalance();
 
-      // const contractFromUser2 = await hre.ethers.getContractAt(
-      //   "DumbNFT",
-      //   dumbNFT.address,
-      //   user2
-      // );
+        await dumbNFT.toggleRevealAll();
+        expect(await dumbNFT.revealAll()).to.equal(true);
 
-      // await dumbNFT.mint(1450, {
-      //   value: hre.ethers.BigNumber.from("14500000000000000000"),
-      // });
+        //expect contract balance to be - 30% after dev cut
+        console.log(
+          "contract balance =" +
+            contBalancePreDev +
+            " after Dev cut = " +
+            (await dumbNFT.balance()) +
+            " Devs got 30% = " +
+            contBalancePreDev * 0.3
+        );
+        // expect(await dumbNFT.balance()).to.equal(
+        //   hre.ethers.BigNumber.from((contBalancePreDev - contBalancePreDev * 0.3).toString())
+        // );
 
-      // await contractFromUser1.mint(3770, {
-      //   value: hre.ethers.BigNumber.from("37700000000000000000"),
-      // });
+        //calculate each winners winnings
+        const winnerAmount = await dumbNFT._calculateWinnersSplitTEST();
 
-      // await contractFromUser2.mint(2653, {
-      //   value: hre.ethers.BigNumber.from("26530000000000000000"),
-      // });
+        //variable for testing winning/losing NFT
+        const winningNFTid = randomArray[1];
 
-      // //ensure values are correct after everyones mint
-      // expect(await dumbNFT.gameNumber()).to.eq(1);
-      // expect(await dumbNFT.gameStartingTokenID()).to.eq(0);
+        //claim all NFTs and withdraw
+        let withdrawn = 0;
+        let dupsclaimed = 0;
+        prevTotalSupply = await dumbNFT.totalSupply();
 
-      // await dumbNFT.setSaleState(0);
+        for (let i = 0; i < randomArray.length; i++) {
+          const isClaimed = await dumbNFT.claimed(randomArray[i]);
+          if (isClaimed) {
+            dupsclaimed++;
+            await expect(dumbNFT.withdrawETHWinner(randomArray[i])).to.be.revertedWith(
+              "lol...come on man you already...begging you lol"
+            );
+          } else {
+            withdrawn++;
+            contBalanceBeforeWinnerWithdraw = await dumbNFT.balance();
+            await dumbNFT.withdrawETHWinner(randomArray[i]);
+            contBalanceAfterWinnerWithdraw = await dumbNFT.balance();
+            expect(await dumbNFT.balance()).to.equal(
+              hre.ethers.BigNumber.from(contBalanceBeforeWinnerWithdraw.sub(winnerAmount).toString())
+            );
+          }
+        }
+        console.log(
+          "there were this many wins unclaimed = " + dupsclaimed + " and each one is worth = " + winnerAmount
+        );
+        console.log("contract balance after everyones withdraws" + (await dumbNFT.balance()));
+        //check contract is now empty (everything has been withdrawn, expect dups)
+        // expect(await dumbNFT.balance()).to.equal(
+        //   (hre.ethers.BigNumber.from(dupsclaimed.toString()) * winnerAmount).toString()
+        // );
 
-      // const expectedRandomArray = [1001, 268, 7655, 406, 5555, 2689];
-      // await dumbNFT.setRandom(expectedRandomArray);
+        expect(await dumbNFT.totalSupply()).to.eq(prevTotalSupply.add(withdrawn));
 
-      // await dumbNFT.toggleRevealAll();
-      // expect(await dumbNFT.tokenURI(1688)).to.eq("Revealed");
+        //ensure minted NFT is going to be usable nextgame
+        expect(await dumbNFT.totalSupply()).to.eq((await dumbNFT.gameStartingTokenID()).add(withdrawn));
+
+        expect(await dumbNFT.tokenURI(winningNFTid)).to.eq("Winner.json");
+        expect(await dumbNFT.tokenURI(505)).to.eq("Loser.json");
+
+        //save the struct and make sure values are correct
+        let prevGameStruct = await dumbNFT.games(i - 1);
+        let gameStruct = await dumbNFT.games(i);
+        expect(gameStruct.gameId).to.eq(i);
+        expect(gameStruct.numMints).to.eq(mintedAmount);
+        expect(gameStruct.mintStart).to.eq(prevGameStruct.mintStart);
+
+        //end game and get the next game started
+        await dumbNFT.toggleRevealAll();
+
+        ////////////End OF GAME 1 ///////////////////
+      }
     });
   });
 });
