@@ -1,3 +1,7 @@
+/*
+- make price immutable and remove price setter
+*/
+
 pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -328,7 +332,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     //++++++++
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
-        require(tokenId < totalSupply(), "This token is greater than maxSupply");
+        require(tokenId <= totalSupply(), "This token is greater than maxSupply");
 
         if (revealAll == true) {
             if(_verifyWinnerforTokenUri(tokenId) == true){
