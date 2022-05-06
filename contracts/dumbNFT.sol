@@ -14,12 +14,12 @@ import "hardhat/console.sol";
 
 
 contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
-    VRFCoordinatorV2Interface COORDINATOR;
-    address vrfCoordinator = 0x6168499c0cFfCaCD319c818142124B7A15E857ab; //(RINKEBY) 
-    bytes32 internal keyHash = 0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc; //(RINKEBY)
-    uint32 callbackGasLimit = 2000000;
-    uint16 requestConfirmations = 3;
-    uint64 s_subscriptionId;
+    VRFCoordinatorV2Interface immutable COORDINATOR;
+    address constant vrfCoordinator = 0x6168499c0cFfCaCD319c818142124B7A15E857ab; //(RINKEBY) 
+    bytes32 constant internal keyHash = 0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc; //(RINKEBY)
+    uint32 constant callbackGasLimit = 2000000;
+    uint16 constant requestConfirmations = 3;
+    uint64 immutable s_subscriptionId;
 
     enum SaleState {
         Disabled,
@@ -54,9 +54,10 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     
     address payable devWallet; 
 
-    event Revealed(uint256 timestamp, uint256[] winningNFTs);
+  
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
     event GameComplete(Game game);
+    event unClaimedNFTs(uint256 timestamp, uint256[] remainingUnclaimed);
 
 
     constructor(uint64 subscriptionId) ERC721A("DumbNFT", "DNFT") VRFConsumerBaseV2(vrfCoordinator) {
@@ -108,13 +109,13 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
     }
 
-    function withdrawETHWinner(uint256 tokenId_) external payable whenRevealIsEnabled onlyWinner(tokenId_) {
+    function withdrawETHWinner(uint256 tokenId_) external whenRevealIsEnabled onlyWinner(tokenId_) {
         require(msg.sender != address(0), "Cannot recover ETH to the 0 address");
         payable(msg.sender).transfer(winnerAmountPerNFT);
         claimed[tokenId_] = true;
-        //TEST IF THIS ACTUALLY MESSES WITH THE GAME
-        mintForCommunity(msg.sender,1);
+        _mintForCommunity(msg.sender);
         _removeWinningTokenOnceClaimed(tokenId_);
+        emit unClaimedNFTs(block.timestamp, random);
     }
 
 
@@ -172,17 +173,12 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         unRevealUri = uri_;
     }
 
-    // Un-paid mint function for community giveaways
-    function mintForCommunity(address to_, uint256 amount_) public onlyOwner {
-        _safeMint(to_, amount_);
-    }
-
 
     function toggleRevealAll() external onlyOwner {
         revealAll = !revealAll;
         if(revealAll == true){
             _endGame();
-            emit Revealed(block.timestamp, random);
+            emit unClaimedNFTs(block.timestamp, random);
         }
         //if we are going back to unrevealed state (aka start a new game), must set random to empty array to start from scratch
         else{
@@ -200,6 +196,11 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
     function _startTokenId() internal view virtual override returns (uint256) {
         return 1;
+    }
+
+    // Un-paid mint function for community giveaways
+    function _mintForCommunity(address to_) internal {
+        _safeMint(to_, 1);
     }
 
     function _endGame() internal {
