@@ -26,16 +26,8 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         Enable
     }
 
-    struct Game{
-        uint256[] random;
-        uint256 gameId;// same as gameNumber
-        uint32 numWords;
-        uint256 numMints;
-        uint256 mintStart;
-    }
     /////////////////////////////TURN CLAIMED PRIVATE AFTER TESTING///////////////////////////////////////////
     mapping(uint256=>bool) public claimed;
-    mapping(uint256=>Game) public games; 
 
     SaleState public saleState = SaleState.Disabled;
     
@@ -48,6 +40,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     uint256 public gameNumber;
     uint256 public gameStartingTokenID;
     uint256[] public random;
+    uint256[] public randomPermenant;
     uint256[] public emergencyRandom;
     string public unRevealUri;
     string public revealUri;
@@ -56,7 +49,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
   
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
-    event GameComplete(Game game);
+    event GameComplete(uint256[] random, uint256 gameId, uint32 numWords, uint256 numMints, uint256 mintStart);
     event unClaimedNFTs(uint256 timestamp, uint256[] remainingUnclaimed);
 
 
@@ -72,11 +65,6 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         price = 10000000000000000;
         gameNumber = 1;
         gameStartingTokenID = 0;
-
-        //initialize index 0  of games. We're starting from game 1
-        games[0].gameId = 0;
-        games[0].numWords = 0;
-        games[0].numMints = 0;
     }
 
     modifier whenSaleIsActive() {
@@ -182,12 +170,10 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         }
         //if we are going back to unrevealed state (aka start a new game), must set random to empty array to start from scratch
         else{
-            resetRandom();
+            
+            delete random;
+            delete randomPermenant;
         }
-    }
-
-    function resetRandom() public onlyOwner {
-        random = games[0].random;
     }
 
     //++++++++
@@ -199,19 +185,15 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     }
 
     // Un-paid mint function for community giveaways
-    function _mintForCommunity(address to_) internal {
+    function _mintForCommunity(address to_) private {
         _safeMint(to_, 1);
     }
 
-    function _endGame() internal {
-        //set games struct
-        games[gameNumber].random = random;
-        games[gameNumber].gameId = gameNumber;
-        games[gameNumber].numWords = numWords;
-        games[gameNumber].numMints = totalSupply() - gameStartingTokenID;
-        games[gameNumber].mintStart = gameStartingTokenID;
-       
-        emit GameComplete(games[gameNumber]);
+    function _endGame() private {
+        delete randomPermenant;
+        randomPermenant = random;
+        uint256 numMints = totalSupply() - gameStartingTokenID;
+        emit GameComplete(random, gameNumber, numWords, numMints, gameStartingTokenID);
 
         //Prep values for next game
         gameNumber+=1;
@@ -221,7 +203,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     }
 
     
-    function _devWithdraw() internal {
+    function _devWithdraw() private {
         uint256 balance = address(this).balance;
         //console.log("contract balance before = %s", balance);
         balance = balance * devSplit /100;
@@ -249,7 +231,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     // removes winning token from random to ensure winners dont claim twice
     // in addition resets random 1 by 1, so we don't have to delete values later on
     // will still have to scrub values if any left
-    function _removeWinningTokenOnceClaimed(uint256 tokenId_) internal {
+    function _removeWinningTokenOnceClaimed(uint256 tokenId_) private {
         for (uint256 i = 0; i < random.length; i++){
             if (tokenId_ == random[i]){
                 random[i] = random[random.length -1];
@@ -263,7 +245,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         _filterRandoms();
     }
 
-    function _filterRandoms() internal {
+    function _filterRandoms() private {
         uint256 currGameNumMints = totalSupply() - gameStartingTokenID; 
         if(gameNumber == 1){
             for(uint256 i = 0; i < random.length; i++){
@@ -277,7 +259,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         }
     }
 
-    function _setNumWords() internal {
+    function _setNumWords() private {
         //capping winners to always be a max of 500
         if((((totalSupply() - gameStartingTokenID)* 5)/ 100) > 500){
             numWords = 500;
@@ -299,8 +281,8 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     function _verifyWinnerforTokenUri(uint256 tokenId_) internal view returns(bool){
         bool winner;
         for (uint256 i=0; i<=gameNumber; i++){
-            if(games[i].mintStart < tokenId_ && tokenId_ < games[i].numMints){
-                return _verifyWinnerbyTokenId(tokenId_, games[i].random);
+            if(gameStartingTokenID < tokenId_ && tokenId_ < (totalSupply() - gameStartingTokenID)){
+                return _verifyWinnerbyTokenId(tokenId_, randomPermenant);
             }
         }
         return winner;
@@ -312,7 +294,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     
     //run once round is done
     function resetEmergencyRandom() public onlyOwner {
-        emergencyRandom = games[0].random;
+        delete emergencyRandom;
     }
     //in case we need to run multiple getRandom() to reach the 5% number of winners
     function appendToEmergencyRandom() public onlyOwner{
@@ -320,8 +302,8 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
             emergencyRandom.push(random[i]);
         }
     }
-    function switchBackEmergyRandomWithRandom() public onlyOwner{
-        random = games[0].random;
+    function switchBackEmergencyRandomWithRandom() public onlyOwner{
+        delete random;
         for(uint256 i=0; i<emergencyRandom.length;i++){
             random.push(emergencyRandom[i]);
         }
@@ -354,6 +336,9 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     function setRandom(uint256[] calldata random_) public {
         random = random_;
     }
+    function getRandomTEST() public returns(uint256[] memory) {
+        return random;
+    }
 
     function deposit() external payable {
         require(msg.value > 1 ether, "please send two ether");
@@ -384,6 +369,14 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
             }
         }
         return false;
+    }
+    function _removeWinningTokenOnceClaimedTEST(uint256 tokenId_) public {
+        for (uint256 i = 0; i < random.length; i++){
+            if (tokenId_ == random[i]){
+                random[i] = random[random.length -1];
+                random.pop();
+            }
+        }
     }
 
 }
