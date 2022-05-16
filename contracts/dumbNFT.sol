@@ -3,13 +3,11 @@
 */
 
 pragma solidity 0.8.7;
-
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
-import "hardhat/console.sol";
 
 
 
@@ -45,12 +43,14 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
     string public unRevealUri;
     string public revealUri;
     
-    address payable devWallet; 
+    address payable devWallet;
+
 
   
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
     event GameComplete(uint256[] random, uint256 gameId, uint32 numWords, uint256 numMints, uint256 mintStart);
-    event unClaimedNFTs(uint256 timestamp, uint256[] remainingUnclaimed);
+    event UnClaimedNFTs(uint256[] remainingUnclaimed, uint256 timestamp);
+    event PriceChange(uint256 mintPrice,uint256 timestamp);
 
 
     constructor(uint64 subscriptionId) ERC721A("DumbNFT", "DNFT") VRFConsumerBaseV2(vrfCoordinator) {
@@ -65,7 +65,9 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         price = 10000000000000000;
         gameNumber = 1;
         gameStartingTokenID = 0;
+       
     }
+
 
     modifier whenSaleIsActive() {
         require(saleState != SaleState.Disabled, "Sale is not active");
@@ -103,7 +105,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         claimed[tokenId_] = true;
         _mintForCommunity(msg.sender);
         _removeWinningTokenOnceClaimed(tokenId_);
-        emit unClaimedNFTs(block.timestamp, random);
+        emit UnClaimedNFTs(random, block.timestamp);
     }
 
 
@@ -129,6 +131,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
     function setMintPrice(uint256 _mintPrice) external onlyOwner {
         price = _mintPrice;
+        emit PriceChange(price,block.timestamp);
     }
 
     // Get random for revealed NFTs
@@ -166,7 +169,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         revealAll = !revealAll;
         if(revealAll == true){
             _endGame();
-            emit unClaimedNFTs(block.timestamp, random);
+            emit UnClaimedNFTs(random, block.timestamp);
         }
         //if we are going back to unrevealed state (aka start a new game), must set random to empty array to start from scratch
         else{
@@ -328,7 +331,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
             return unRevealUri;
         }
     }
-
+    
     //++++++++
     // Test functions
     //++++++++
