@@ -1,9 +1,10 @@
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
- require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-waffle");
 
- require("hardhat-gas-reporter");
+require("hardhat-gas-reporter");
+require("hardhat-deploy");
 
 const config = {
   networks: {
@@ -19,7 +20,6 @@ const config = {
     enabled: true,
     coinmarketcap: "2bd639b0-ef37-4768-8aa5-b1f6dd6ed437",
     currency: "USD",
-    
   },
   // etherscan: {
   //   apiKey: ETHERSCAN_API_KEY,

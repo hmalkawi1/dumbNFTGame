@@ -16,6 +16,11 @@ abstract contract Withdrawable is Ownable {
         receiver.transfer(amount);
     }
 
+    // function withdrawETH(address payable receiver, uint256 amount) external onlyOwner {
+    //     require(receiver != address(0), "Cannot recover ETH to the 0 address");
+    //     receiver.transfer(amount);
+    // }
+
     function withdrawTokens(
         IERC20 token,
         address receiver,
