@@ -49,8 +49,10 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
   
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
     event GameComplete(uint256[] random, uint256 gameId, uint32 numWords, uint256 numMints, uint256 mintStart);
+    event Revealed(bool revealAll);
     event UnClaimedNFTs(uint256[] remainingUnclaimed, uint256 timestamp);
     event PriceChange(uint256 mintPrice,uint256 timestamp);
+    event NewMint(uint256 supply,uint256 timestamp);
 
 
     constructor(uint64 subscriptionId) ERC721A("DumbNFT", "DNFT") VRFConsumerBaseV2(vrfCoordinator) {
@@ -96,6 +98,8 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
         require(price * amount == msg.value, "Value sent is not correct");
         
         _safeMint(msg.sender, amount);
+
+        emit NewMint(totalSupply(), block.timestamp);
 
     }
 
@@ -167,6 +171,7 @@ contract DumbNFT is ERC721A, VRFConsumerBaseV2, Ownable {
 
     function toggleRevealAll() external onlyOwner {
         revealAll = !revealAll;
+        emit Revealed(revealAll);
         if(revealAll == true){
             _endGame();
             emit UnClaimedNFTs(random, block.timestamp);
